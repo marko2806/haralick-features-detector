@@ -8,6 +8,17 @@ from sklearn.neighbors import KNeighborsClassifier
 import mahotas
 import matplotlib.pyplot as plt
 from math import ceil
+from pylab import imshow, show
+
+def preprocessImage(image):
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    image = mahotas.gaussian_filter(image, 4)
+    # setting threshold
+    threshed = (image > image.mean())
+
+    # making is labeled image
+    labeled, n = mahotas.label(threshed)
+    return labeled
 
 def getHaralickFeaturesForDataset():
     train_path_true = ".\\dataset\\train\\true\\"
@@ -23,12 +34,14 @@ def getHaralickFeaturesForDataset():
     X = []
     for image in true_train_files:
         imageArray = cv2.imread(image)
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGB2GRAY)
+        imageArray = preprocessImage(imageArray)
+        #imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGB2GRAY)
         haralickFeatures = getHaralickFeatures(imageArray)
         X.append(haralickFeatures)
     for image in false_train_files:
         imageArray = cv2.imread(image)
-        imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGB2GRAY)
+        imageArray = preprocessImage(imageArray)
+        #imageArray = cv2.cvtColor(imageArray, cv2.COLOR_RGB2GRAY)
         haralickFeatures = getHaralickFeatures(imageArray)
         X.append(haralickFeatures)
 
@@ -36,7 +49,7 @@ def getHaralickFeaturesForDataset():
 
 
 def getHaralickFeatures(subimage):
-    return mahotas.features.haralick(subimage).mean(axis=0)
+    return mahotas.features.haralick(subimage).mean(axis=0).flatten()
 
 
 def performClassification(subimages, model):
@@ -55,7 +68,7 @@ def getMaskAfterClassification(image, slidingWindowAreas, model):
     predictions = performClassification(np.array(subimages), model)
     counter = 0
     for start_x, end_x, start_y, end_y in slidingWindowAreas:
-        mask[start_y:end_y, start_x:end_x] = np.logical_or(mask[start_y:end_y, start_x:end_x],predictions[counter])
+        mask[start_y:end_y, start_x:end_x] = np.logical_or(mask[start_y:end_y, start_x:end_x], predictions[counter])
         counter += 1
     return mask
 
@@ -80,14 +93,16 @@ classifier.fit(X, y)
 
 # citanje slike
 image = cv2.imread("test_image2.png")
-image = cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
-image = cv2.resize(image, (int(image.shape[1] * 0.5), int(image.shape[0] * 0.5)))
+#image = cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
+#image = cv2.resize(image, (int(image.shape[1] * 0.75), int(image.shape[0] * 0.75)))
+image = preprocessImage(image)
 features = getHaralickFeatures(image)
 # shape 13,13
-slidingWindows = getSlidingWindowAreas(image, 100, 100, 25)
+slidingWindows = getSlidingWindowAreas(image, 50, 50, 25)
 mask = getMaskAfterClassification(image, slidingWindows, classifier)
 
-cv2.imshow("real", image)
+imshow(image)
+show()
 cv2.imshow("test", mask)
 cv2.waitKey()
 cv2.destroyAllWindows()
