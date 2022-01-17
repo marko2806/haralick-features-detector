@@ -1,23 +1,24 @@
-import glob
 import argparse
-import cv2
 import numpy as np
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 import mahotas
-from pylab import imshow, show
+from matplotlib import pyplot
 from multiprocessing import Pool
 import time
 from model import Model
 from data import *
-#from video_processing import processVideo
+from postprocessing import process_mask as postprocess_mask
 
-ap = argparse.ArgumentParser()
+# from video_processing import processVideo
+
+ap = argparse.ArgumentParser(prog='main')
 ap.add_argument("--verbose", default=False)
 ap.add_argument("--model-path", default=None)
 ap.add_argument("--save-model", default=False)
 ap.add_argument("--log-results", default=False)
 ap.add_argument("--log-path", default=False)
+ap.add_argument("--save-result", default=False) # dodano za kasnije,
 
 args = vars(ap.parse_args())
 
@@ -26,11 +27,11 @@ model_path = args["model_path"]
 save_model_flag = args["save_model"]
 log_results = args["log_results"]
 log_path = args["log_path"]
+save_result_image = args["save_result"]  # argument za spremanje maske
 
 verbose = True
-
-
-
+model_path = './model.joblib'
+saving_path = './result_images/'
 
 
 def logResults(filePath: str, iou: float, mdr: float, fdr: float):
@@ -97,12 +98,12 @@ def getSlidingWindowAreas(image, windowWidth, windowHeight, stride=None):
 
 
 if __name__ == '__main__':
-    X_train, y_train = getHaralickFeaturesForTrainingSet(verbose)
-    #X_test, y_test = getHaralickFeaturesForTestSet(verbose)
+    # X_test, y_test = getHaralickFeaturesForTestSet(verbose)
     classifier = Model()
     if model_path is not None:
         classifier.load_model(model_path)
     else:
+        X_train, y_train = getHaralickFeaturesForTrainingSet(verbose) # stavljeno unutar else-a, nema smisla da bude gore
         classifier.model = SVC(kernel="linear", degree=3)
 
         if verbose:
@@ -112,7 +113,7 @@ if __name__ == '__main__':
         if save_model_flag and model_path is not None:
             classifier.save_model(model_path)
 
-    #y_predicted_test = classifier.make_prediction(X_test)
+    # y_predicted_test = classifier.make_prediction(X_test)
     # evaluate_classifier(y_predicted_test, y_test)
 
     '''
@@ -126,18 +127,21 @@ if __name__ == '__main__':
 
     # citanje slike
     image = cv2.imread("sample_images/test_image2.png")
-    #image = cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
-    #image = cv2.resize(image, (int(image.shape[1] * 0.75), int(image.shape[0] * 0.75)))
+    # image = cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
+    # image = cv2.resize(image, (int(image.shape[1] * 0.75), int(image.shape[0] * 0.75)))
     image = preprocessImage(image)
     features = getHaralickFeatures(image)
     # shape 13,13
     slidingWindows = getSlidingWindowAreas(image, 40, 40, 20)
 
     with Pool(6) as p:
-        mask = getMaskAfterClassification(image, slidingWindows, classifier,p)
-    imshow(image)
-    show()
-    cv2.imshow("test", mask)
-    cv2.waitKey()
-    cv2.destroyAllWindows()
+        mask = getMaskAfterClassification(image, slidingWindows, classifier, p)
+    p.join() # dodano da skupi threadove
+    pyplot.imshow(image)
+    pyplot.show()
+    pyplot.imshow(mask)
+    pyplot.title('Sliding window result')
+    pyplot.show()
 
+    # Postprocesiranje, pyplota sve korake
+    # new_mask = postprocess_mask(mask)
