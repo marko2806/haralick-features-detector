@@ -87,8 +87,7 @@ def create_mask_file(width, height, bitness, background, shapes, scale_factor):
 
 
 def getMaskForFrame(path, frame, scale_factor=1):
-    savedir = '\\'.join(path.split("\\")[0:-1])+"\\"+'masks'
-    dir_create(savedir)
+
     mask_bitness = 24
     masks = []
 
@@ -110,13 +109,15 @@ def getMaskForFrame(path, frame, scale_factor=1):
                                   scale_factor)
     mask = background
     #print(background)
-    name = path.split("\\")[-1][:-4]
-    loc = savedir+'\\'+name
-    saveloc = loc+(str(frame))+(".png")
+    # savedir = '\\'.join(path.split("\\")[0:-1]) + "\\" + 'masks'
+    # dir_create(savedir)
+    # name = path.split("\\")[-1][:-4]
+    # loc = savedir+'\\'+name
+    # saveloc = loc+(str(frame))+(".png")
     #print(saveloc)
-    cv2.imwrite(saveloc, background)
+    #cv2.imwrite(saveloc, background)
     #print(mask.shape)
     return mask
 
-#getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-615052322-640_adpp.xml', 1)
-#print()
+getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-142122509-640_adpp_New.xml', 1)
+print()
