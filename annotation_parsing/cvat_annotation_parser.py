@@ -86,38 +86,37 @@ def create_mask_file(width, height, bitness, background, shapes, scale_factor):
     return mask
 
 
-def getMaskForFrame(path, frames: np.array, scale_factor=1):
+def getMaskForFrame(path, frame, scale_factor=1):
     savedir = '\\'.join(path.split("\\")[0:-1])+"\\"+'masks'
     dir_create(savedir)
-    if isinstance(frames, int):
-        frames = [frames]
     mask_bitness = 24
     masks = []
-    for frame in frames:
 
-        #img_path = os.path.join(args.image_dir, img)
-        anno = parse_anno_file(path, frame)
-        shapes = []
-        for shape in anno:
-            shapes.append(shape['shapes'][0])
-        background = []
-        height = anno[0]['height']
-        width = anno[0]['width']
-        background = np.zeros((height, width, 3), np.uint8)
+    #img_path = os.path.join(args.image_dir, img)
+    anno = parse_anno_file(path, frame)
+    shapes = []
+    for shape in anno:
+        shapes.append(shape['shapes'][0])
+    background = []
+    height = anno[0]['height']
+    width = anno[0]['width']
+    background = np.zeros((height, width, 3), np.uint8)
+    # print(shapes)
+    background = create_mask_file(width,
+                                  height,
+                                  mask_bitness,
+                                  background,
+                                  shapes,
+                                  scale_factor)
+    mask = background
+    #print(background)
+    name = path.split("\\")[-1][:-4]
+    loc = savedir+'\\'+name
+    saveloc = loc+(str(frame))+(".png")
+    #print(saveloc)
+    cv2.imwrite(saveloc, background)
+    #print(mask.shape)
+    return mask
 
-        background = create_mask_file(width,
-                                      height,
-                                      mask_bitness,
-                                      background,
-                                      shapes,
-                                      scale_factor)
-        masks.append(background)
-        #print(background)
-        name = path.split("\\")[-1][:-4]
-        loc = savedir+'\\'+name
-        saveloc = loc+(str(frame))+(".png")
-        print(saveloc)
-        cv2.imwrite(saveloc, background)
-    return masks
-
-#getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-462879066-640_adpp.xml', [1, 300])
+#getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-615052322-640_adpp.xml', 1)
+#print()
