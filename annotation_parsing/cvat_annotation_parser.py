@@ -114,10 +114,9 @@ def getMaskForFrame(path, frame, scale_factor=1):
     # name = path.split("\\")[-1][:-4]
     # loc = savedir+'\\'+name
     # saveloc = loc+(str(frame))+(".png")
-    #print(saveloc)
-    #cv2.imwrite(saveloc, background)
-    #print(mask.shape)
+    # print(saveloc)
+    # cv2.imwrite(saveloc, background)
+    # print(mask.shape)
     return mask
 
-getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-142122509-640_adpp_New.xml', 1)
-print()
+#getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-583944852-640_adpp.xml', 1)
