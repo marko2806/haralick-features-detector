@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-from main import preprocessImage, getHaralickFeatures
+from haralick import getHaralickFeatures
+from image_processing import preprocess_image
 import glob
 
 
@@ -22,14 +23,14 @@ def getHaralickFeaturesForTrainingSet(verbose=False):
         print("Processing crowd images")
     for image in true_train_files:
         imageArray = cv2.imread(image)
-        imageArray = preprocessImage(imageArray)
+        imageArray = preprocess_image(imageArray)
         haralickFeatures = getHaralickFeatures(imageArray)
         X.append(haralickFeatures)
     if verbose:
         print("Processing non-crowd images")
     for image in false_train_files:
         imageArray = cv2.imread(image)
-        imageArray = preprocessImage(imageArray)
+        imageArray = preprocess_image(imageArray)
         haralickFeatures = getHaralickFeatures(imageArray)
         X.append(haralickFeatures)
     if verbose:
@@ -55,14 +56,14 @@ def getHaralickFeaturesForTestSet(verbose=False):
         print("Processing crowd images")
     for image in true_test_files:
         imageArray = cv2.imread(image)
-        imageArray = preprocessImage(imageArray)
+        imageArray = preprocess_image(imageArray)
         haralickFeatures = getHaralickFeatures(imageArray)
         X.append(haralickFeatures)
     if verbose:
         print("Processing non-crowd images")
     for image in false_test_files:
         imageArray = cv2.imread(image)
-        imageArray = preprocessImage(imageArray)
+        imageArray = preprocess_image(imageArray)
         haralickFeatures = getHaralickFeatures(imageArray)
         X.append(haralickFeatures)
     if verbose:

@@ -1,9 +1,7 @@
 import cv2
-from main import preprocessImage, getSlidingWindowAreas, getMaskAfterClassification
-from multiprocessing import Pool
 
 
-def processVideo(filePath: str, classifier):
+def processVideo(filePath: str, processFrame, skip_frames=1, verbose=False):
     cap = cv2.VideoCapture(filePath)
     while not cap.isOpened():
         cap = cv2.VideoCapture(filePath)
@@ -11,34 +9,23 @@ def processVideo(filePath: str, classifier):
         print("Wait for the header")
 
     pos_frame = cap.get(cv2.CAP_PROP_POS_FRAMES)
+    print("Processing video:" + filePath)
+    print("Number of frames:" + str(int(cap.get(cv2.CAP_PROP_FRAME_COUNT))))
     while True:
         flag, frame = cap.read()
         if flag:
             # The frame is ready and already captured
-            if pos_frame % 10 == 0:
-                frame = preprocessImage(frame)
-                # shape 13,13
-                slidingWindows = getSlidingWindowAreas(frame, 40, 40, 20)
-                with Pool(6) as p:
-                    mask = getMaskAfterClassification(frame, slidingWindows, classifier, p)
-                '''imshow(frame)
-                show()
-                cv2.imshow("test", mask)
-                cv2.waitKey()
-                cv2.destroyAllWindows()'''
-                print("Processed frame " + str(pos_frame))
+            if pos_frame % skip_frames == 0:
+                if processFrame is not None:
+                    processFrame(frame, filePath, pos_frame)
+                if verbose:
+                    print("Processed frame " + str(int(pos_frame)))
             pos_frame = cap.get(cv2.CAP_PROP_POS_FRAMES)
-
         else:
             # The next frame is not ready, so we try to read it again
             cap.set(cv2.CAP_PROP_POS_FRAMES, pos_frame - 1)
-            print("frame is not ready")
-            # It is better to wait for a while for the next frame to be ready
-            cv2.waitKey(1000)
-
-        if cv2.waitKey(10) == 27:
-            break
-        if cap.get(cv2.CAP_PROP_POS_FRAMES) == cap.get(cv2.CAP_PROP_FRAME_COUNT):
+            print("frame is not ready:" + str(pos_frame))
+        if cap.get(cv2.CAP_PROP_POS_FRAMES) + 1 == cap.get(cv2.CAP_PROP_FRAME_COUNT):
             # If the number of captured frames is equal to the total number of frames,
             # we stop
             break

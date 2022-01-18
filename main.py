@@ -1,75 +1,53 @@
-import glob
 import argparse
-import cv2
 import numpy as np
+import cv2
+import glob
 from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
-import mahotas
-from pylab import imshow, show
 from multiprocessing import Pool
 import time
 from model import Model
-from data import *
-#from video_processing import processVideo
+from data import getHaralickFeaturesForTrainingSet, getHaralickFeaturesForTestSet
+from video_processing import processVideo
+from image_processing import preprocess_image
+from haralick import *
+from logger import Logger
+from cvat_annotation_parser import getMaskForFrame
+from image_processing import process_mask as postprocess_mask
+from evaluation import get_IOU, get_classification_metrics
+from movement_calcualtion import get_movement_image
+
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--verbose", default=False)
-ap.add_argument("--model-path", default=None)
-ap.add_argument("--save-model", default=False)
+ap.add_argument("--verbose",     default=True)
+ap.add_argument("--model-path",  default=None)
+ap.add_argument("--save-model",  default=False)
+ap.add_argument("--load-model",  default=False)
 ap.add_argument("--log-results", default=False)
-ap.add_argument("--log-path", default=False)
+ap.add_argument("--log-path",    default=None)
+ap.add_argument("--window-size", default=50)
+ap.add_argument("--stride", default=25)
 
 args = vars(ap.parse_args())
 
 verbose = args["verbose"]
 model_path = args["model_path"]
 save_model_flag = args["save_model"]
+load_model_flag = args["load_model"]
 log_results = args["log_results"]
 log_path = args["log_path"]
-
-verbose = True
-
-
-
-
-
-def logResults(filePath: str, iou: float, mdr: float, fdr: float):
-    if verbose:
-        print("Logging results to " + filePath)
-    with open(filePath, "w") as file:
-        file.write("IOU: " + str(iou) + "\n")
-        file.write("MDR: " + str(mdr) + "\n")
-        file.write("FDR: " + str(fdr) + "\n")
-
-
-def preprocessImage(image):
-    image = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
-    image = mahotas.gaussian_filter(image, 1)
-    image = cv2.resize(image, (640, 380))
-    threshed = (image >= image.mean())
-    labeled, n = mahotas.label(threshed)
-    return labeled
-
-
-def getHaralickFeatures(subimage):
-    return mahotas.features.haralick(subimage).mean(axis=0)
-
-
-def performClassification(subimages, model):
-    return model.make_prediction(subimages)
-
-
-def getHaralickForWindow(window, image):
-    start_x, end_x, start_y, end_y = window
-    return getHaralickFeatures(image[start_y:end_y, start_x:end_x])
+window_size = int(args["window_size"])
+stride = int(args["stride"])
 
 
 def getMaskAfterClassification(image, slidingWindowAreas, model, pools):
+    if verbose:
+        print("Performing segmentation")
     start_time = time.time()
-    mask = np.zeros(shape=image.shape)
+    mask = np.zeros(shape=image.shape, dtype=np.uint8)
     image_list = [image] * len(slidingWindowAreas)
     subimages = pools.starmap(getHaralickForWindow, zip(slidingWindowAreas, image_list))
-    predictions = performClassification(np.array(subimages), model)
+    predictions = model.make_prediction(np.array(subimages))
     counter = 0
     for start_x, end_x, start_y, end_y in slidingWindowAreas:
         mask[start_y:end_y, start_x:end_x] = np.logical_or(mask[start_y:end_y, start_x:end_x], predictions[counter])
@@ -81,63 +59,78 @@ def getMaskAfterClassification(image, slidingWindowAreas, model, pools):
     return mask
 
 
-def getSlidingWindowAreas(image, windowWidth, windowHeight, stride=None):
+def getSlidingWindowAreas(imageWidth, imageHeight, windowSize, stride=None):
     if verbose:
         print("Getting sliding window")
     if stride is None:
-        stride = windowWidth
+        stride = windowSize
 
     windowAreas = []
-    for i in range(0, image.shape[0], stride):
-        for j in range(0, image.shape[1], stride):
-            # start_x, end_x, start_y, end_y
-            windowAreas.append((j, j + windowWidth,
-                                i, i + windowHeight))
+    for i in range(0, imageHeight, stride):
+        for j in range(0, imageWidth, stride):
+            windowAreas.append((j, j + windowSize,
+                                i, i + windowSize))
     return windowAreas
 
 
-if __name__ == '__main__':
-    X_train, y_train = getHaralickFeaturesForTrainingSet(verbose)
-    #X_test, y_test = getHaralickFeaturesForTestSet(verbose)
-    classifier = Model()
-    if model_path is not None:
-        classifier.load_model(model_path)
-    else:
-        classifier.model = SVC(kernel="linear", degree=3)
+ious = []
+mdrs = []
+fdrs = []
+previousMask = []
 
+def processFrame(frame, filePath, frameNumber):
+    originalFrame = frame.copy()
+    frame = preprocess_image(frame)
+    slidingWindows = getSlidingWindowAreas(frame.shape[1], frame.shape[0], window_size, stride)
+    with Pool(12) as p:
+        mask1 = getMaskForFrame("labels" + filePath[6:-4] + ".xml", int(frameNumber))
+        mask = getMaskAfterClassification(frame, slidingWindows, classifier, p)
+    mask = postprocess_mask(mask)
+    border = cv2.copyMakeBorder(mask, 1, 1, 1, 1, cv2.BORDER_CONSTANT, value=0)
+    contours, _ = cv2.findContours(border, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE, offset=(-1, -1))
+    cv2.drawContours(originalFrame, contours, -1, (36, 255, 12), thickness=1)
+    if len(previousMask) > 0:
+        get_movement_image(previousMask.pop(), mask, originalFrame)
+    previousMask.append(mask)
+    cv2.waitKey()
+    cv2.imwrite("./detections/" + filePath[6:-4] + "_" + str(int(frameNumber)) + ".png", originalFrame)
+    iou = get_IOU(mask, mask1)
+    ious.append(iou)
+
+
+# izvodi samo glavna dretva
+if __name__ == '__main__':
+    classifier = Model()
+    logger = Logger(log_path)
+    if load_model_flag and model_path is not None:
+        classifier.load_model(model_path, verbose)
+    else:
+        X_train, y_train = getHaralickFeaturesForTrainingSet(verbose)
+
+        classifier.model = SVC(kernel="linear", C=1)
+        #classifier.model = KNeighborsClassifier(n_neighbors=2)
         if verbose:
             print("Training classifier")
         classifier.train_model(X_train, y_train)
-
         if save_model_flag and model_path is not None:
-            classifier.save_model(model_path)
+            classifier.save_model(model_path, verbose)
 
-    #y_predicted_test = classifier.make_prediction(X_test)
-    # evaluate_classifier(y_predicted_test, y_test)
+    X_test, y_test = getHaralickFeaturesForTestSet(verbose)
+    FDR, MDR, P, R, F1 = get_classification_metrics(y_test, classifier.make_prediction(X_test))
+    if verbose:
+        print("MDR: " + str(MDR))
+        print("FDR: " + str(FDR))
+        print("P: " + str(P))
+        print("R: " + str(R))
+        print("F1: " + str(F1))
 
-    '''
     videos = glob.glob("videos/*")
-    print("Videos :" + str(videos))
     for video in videos:
-        processVideo(video, classifier)
+        processVideo(video, processFrame, 100, verbose)
+        print(np.mean(np.array(ious)))
+
+    iou = np.mean(np.array(ious))
+
     if log_results and log_path is not None:
-        logResults(log_path, 0.58, 0.21, 0.14)
-    '''
-
-    # citanje slike
-    image = cv2.imread("sample_images/test_image2.png")
-    #image = cv2.cvtColor(image,cv2.COLOR_RGB2GRAY)
-    #image = cv2.resize(image, (int(image.shape[1] * 0.75), int(image.shape[0] * 0.75)))
-    image = preprocessImage(image)
-    features = getHaralickFeatures(image)
-    # shape 13,13
-    slidingWindows = getSlidingWindowAreas(image, 40, 40, 20)
-
-    with Pool(6) as p:
-        mask = getMaskAfterClassification(image, slidingWindows, classifier,p)
-    imshow(image)
-    show()
-    cv2.imshow("test", mask)
-    cv2.waitKey()
-    cv2.destroyAllWindows()
-
+        logger.logSegmentationResults(iou, verbose)
+        logger.logClassificationResults(P, R, F1, MDR, FDR, verbose)
