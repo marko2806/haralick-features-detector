@@ -66,7 +66,6 @@ def parse_anno_file(cvat_xml, image_name):
                 box['xtl'], box['ytl'], box['xbr'], box['ybr'])
             image['shapes'].append(box)
         image['shapes'].sort(key=lambda x: int(x.get('z_order', 0)))
-        print(image)
         anno.append(image)
     return anno
 
@@ -79,7 +78,7 @@ def create_mask_file(width, height, bitness, background, shapes, scale_factor):
         points = points * scale_factor
         points = points.astype(int)
         mask = cv2.drawContours(mask, [points], -1, color=(255, 255, 255), thickness=5)
-        mask = cv2.fillPoly(mask, [points], color=(0, 0, 255))
+        mask = cv2.fillPoly(mask, [points], color=(255, 255, 255))
     return mask
 
 
@@ -93,13 +92,13 @@ def main():
         anno = parse_anno_file(args.cvat_xml, img)
         background = []
         is_first_image = True
+
         for image in anno:
             if is_first_image:
                 current_image = cv2.imread(img_path)
                 height, width, _ = current_image.shape
                 background = np.zeros((height, width, 3), np.uint8)
                 is_first_image = False
-            print("shapes:", image['shapes'],)
             output_path = os.path.join(args.output_dir, img.split('.')[0] + '.png')
             background = create_mask_file(width,
                                           height,

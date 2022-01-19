@@ -52,6 +52,8 @@ def parse_anno_file(cvat_xml, frame):
         shapes.append(child)
     for child in root.iterfind(image_box_frame_attr):
         shapes.append(child)
+    if len(shapes) ==0:
+        return False
     for image_tag in shapes:
         image = {}
         image["width"] = width
@@ -82,7 +84,7 @@ def create_mask_file(width, height, bitness, background, shapes, scale_factor):
         points = points * scale_factor
         points = points.astype(int)
         mask = cv2.drawContours(mask, [points], -1, color=(255, 255, 255), thickness=5)
-        mask = cv2.fillPoly(mask, [points], color=(0, 0, 255))
+        mask = cv2.fillPoly(mask, [points], color=(255, 255, 255))
     return mask
 
 
@@ -93,6 +95,8 @@ def getMaskForFrame(path, frame, scale_factor=1):
 
     #img_path = os.path.join(args.image_dir, img)
     anno = parse_anno_file(path, frame)
+    if anno is False:
+        return
     shapes = []
     for shape in anno:
         shapes.append(shape['shapes'][0])
@@ -109,14 +113,21 @@ def getMaskForFrame(path, frame, scale_factor=1):
                                   scale_factor)
     mask = background
     #print(background)
-    # savedir = '\\'.join(path.split("\\")[0:-1]) + "\\" + 'masks'
-    # dir_create(savedir)
-    # name = path.split("\\")[-1][:-4]
-    # loc = savedir+'\\'+name
-    # saveloc = loc+(str(frame))+(".png")
-    # print(saveloc)
-    # cv2.imwrite(saveloc, background)
-    # print(mask.shape)
-    return mask
+    savedir = '\\'.join(path.split("\\")[0:-1]) + "\\" + 'masks'
+    #dir_create(savedir)
+    name = path.split("\\")[-1][:-4]
+    loc = savedir+'\\'+name
+    saveloc = loc+"frame"+(str(frame))+(".jpg")
+    cv2.imwrite(saveloc, background)
 
-#getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-583944852-640_adpp.xml', 1)
+    return mask
+#
+# getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-583944852-640_adpp.xml', 10)
+# getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-583944852-640_adpp.xml', 20)
+# getMaskForFrame('B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\dataset\\video_sekvence\\GT\\gettyimages-615052322-640_adpp.xml', 0)
+xml_dir='B:\\Desktop\\FER\\DIPL_1\\RaspoznavanjeUzoraka\\haralick-features-detector\\annotation_parsing\\all\\xmls'
+xmls = [f for f in os.listdir(xml_dir) if os.path.isfile(os.path.join(xml_dir, f))]
+for xml in xmls:
+    print(xml)
+    for i in range(1,51):
+        getMaskForFrame(os.path.join(xml_dir, xml), i)
